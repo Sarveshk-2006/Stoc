@@ -9,6 +9,7 @@ interface RoleGuardProps {
   allowedRoles?: RoleType[];
   requiredPermission?: string;
   redirectTo?: string;
+  allowGuest?: boolean;
 }
 
 export const RoleGuard: React.FC<RoleGuardProps> = ({
@@ -16,16 +17,22 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
   allowedRoles,
   requiredPermission,
   redirectTo = '/',
+  allowGuest = false,
 }) => {
   const { activeRole, user, token, addToast } = useAppStore();
   const toastFiredRef = useRef(false);
 
-  // 1. Unauthenticated users -> Redirect to login flow
+  // 1. If allowGuest is enabled (e.g. public QR inspector / Google Lens scanning), permit access
+  if (allowGuest) {
+    return <>{children}</>;
+  }
+
+  // 2. Unauthenticated users -> Redirect to login flow
   if (!token && !user) {
     return <Navigate to="/login" replace />;
   }
 
-  // 2. Check authorization against authoritative permissions & roles
+  // 3. Check authorization against authoritative permissions & roles
   const authorized = isRouteAuthorized(
     allowedRoles,
     requiredPermission,

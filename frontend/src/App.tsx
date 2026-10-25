@@ -144,6 +144,7 @@ export const App: React.FC = () => {
                         <RoleGuard 
                           allowedRoles={['super_admin', 'org_admin', 'warehouse_manager', 'distributor', 'operator', 'supply_chain_manager']}
                           requiredPermission={PERM_SCANS_EXECUTE}
+                          allowGuest={true}
                         >
                           <QRScannerPage />
                         </RoleGuard>
@@ -155,6 +156,7 @@ export const App: React.FC = () => {
                         <RoleGuard 
                           allowedRoles={['super_admin', 'org_admin', 'warehouse_manager', 'distributor', 'operator', 'supply_chain_manager']}
                           requiredPermission={PERM_SCANS_EXECUTE}
+                          allowGuest={true}
                         >
                           <QRScannerPage />
                         </RoleGuard>
