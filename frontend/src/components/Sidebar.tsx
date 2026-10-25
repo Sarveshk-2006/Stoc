@@ -67,7 +67,7 @@ const NAV_GROUPS: NavGroup[] = [
         requiredPermission: PERM_FORECASTS_VIEW
       },
       { 
-        to: '/forecasting#evaluation', 
+        to: '/reports', 
         label: 'Reports', 
         icon: FileText,
         allowedRoles: ['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager'],

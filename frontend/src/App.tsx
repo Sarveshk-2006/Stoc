@@ -18,6 +18,7 @@ import { UsersPage } from './pages/UsersPage';
 import { LoginPage } from './pages/LoginPage';
 import { ExpressLanePage } from './pages/ExpressLanePage';
 import { FleetSimulationPage } from './pages/FleetSimulationPage';
+import { ReportsPage } from './pages/ReportsPage';
 
 import { api } from './services/api';
 import { 
@@ -28,7 +29,8 @@ import {
   PERM_SCANS_EXECUTE, 
   PERM_IOT_READINGS_VIEW, 
   PERM_INTEGRATIONS_MANAGE, 
-  PERM_USERS_MANAGE 
+  PERM_USERS_MANAGE,
+  PERM_REPORTS_VIEW
 } from './utils/permissions';
 
 export const App: React.FC = () => {
@@ -206,7 +208,18 @@ export const App: React.FC = () => {
                     <Route path="/fleet" element={<Navigate to="/simulation" replace />} />
                     <Route path="/routes" element={<Navigate to="/simulation" replace />} />
                     <Route path="/transfers" element={<Navigate to="/express" replace />} />
-                    <Route path="/reports" element={<Navigate to="/forecasting" replace />} />
+                    <Route 
+                      path="/reports" 
+                      element={
+                        <RoleGuard 
+                          allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager']}
+                          requiredPermission={PERM_REPORTS_VIEW}
+                          allowGuest={true}
+                        >
+                          <ReportsPage />
+                        </RoleGuard>
+                      } 
+                    />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </main>

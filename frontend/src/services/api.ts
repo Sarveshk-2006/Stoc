@@ -170,7 +170,14 @@ export const api = {
   // Google OR-Tools Optimizer
   optimization: {
     run: (body: any) => request<any>('/optimization/run', { method: 'POST', body: JSON.stringify(body) }),
-    listRuns: () => request<any[]>('/optimization/runs'),
+    listRuns: async () => {
+      try {
+        return await request<any[]>('/optimization/runs');
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        return Object.values(raw.optimization_runs || {});
+      }
+    },
     getRun: (id: string) => request<any>(`/optimization/run/${id}`),
     createTransferFromRecommendation: (run_id: string, recommendation_id: string, notes?: string) =>
       request<any>('/optimization/create-transfer', {
@@ -181,15 +188,54 @@ export const api = {
 
   // Demand Forecasting
   forecast: {
-    getProductForecast: (productId: string, horizonDays = 14) => 
-      request<any>(`/forecast/product/${productId}?horizon_days=${horizonDays}`),
+    getProductForecast: async (productId: string, horizonDays = 14) => {
+      try {
+        return await request<any>(`/forecast/product/${productId}?horizon_days=${horizonDays}`);
+      } catch (err) {
+        console.warn('Backend forecast unavailable, using embedded seed:', err);
+        const raw = (await import('../data/seedData.json')).default as any;
+        const key = `fc_${productId}_${horizonDays}d`;
+        if (raw.forecasts && raw.forecasts[key]) {
+          return raw.forecasts[key];
+        }
+        const anyMatch = Object.values(raw.forecasts || {}).find((f: any) => f.product_id === productId);
+        if (anyMatch) return anyMatch;
+        return Object.values(raw.forecasts || {})[0];
+      }
+    },
+  },
+
+  // Executive & Operational Reports
+  reports: {
+    getSummary: async () => {
+      try {
+        return await request<any>('/reports/summary');
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        return raw.reports_summary || {};
+      }
+    },
   },
 
   // IoT Cold Chain
   iot: {
-    getDevices: () => request<any[]>('/iot/devices'),
+    getDevices: async () => {
+      try {
+        return await request<any[]>('/iot/devices');
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        return Object.values(raw.iot_devices || {});
+      }
+    },
     getReadings: (deviceId?: string) => request<any[]>(`/iot/readings${deviceId ? `?device_id=${deviceId}` : ''}`),
-    getAlerts: () => request<any[]>('/iot/alerts'),
+    getAlerts: async () => {
+      try {
+        return await request<any[]>('/iot/alerts');
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        return Object.values(raw.alerts || {});
+      }
+    },
     acknowledgeAlert: (id: string) => request<any>(`/iot/alerts/${id}/acknowledge`, { method: 'POST' }),
     injectSimulator: (body: any) => request<any>('/iot/simulator/inject', { method: 'POST', body: JSON.stringify(body) }),
   },
@@ -205,7 +251,14 @@ export const api = {
 
   // Audit Logs
   audit: {
-    list: (limit = 50) => request<any[]>(`/audit?limit=${limit}`),
+    list: async (limit = 50) => {
+      try {
+        return await request<any[]>(`/audit?limit=${limit}`);
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        return (Object.values(raw.audit_logs || {}) as any[]).slice(0, limit);
+      }
+    },
   },
 
   // Express Lane Fast Fulfillment (Quick-Commerce Model)

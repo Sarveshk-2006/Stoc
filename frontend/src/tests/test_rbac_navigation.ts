@@ -41,7 +41,7 @@ const NAV_GROUPS: NavGroup[] = [
         requiredPermission: PERM_FORECASTS_VIEW
       },
       { 
-        to: '/forecasting#evaluation', 
+        to: '/reports', 
         label: 'Reports', 
         allowedRoles: ['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager'],
         requiredPermission: PERM_REPORTS_VIEW
@@ -178,7 +178,7 @@ assert(operatorGroupNames.includes('OPERATIONS'), 'Warehouse Operator sees OPERA
 // Operator individual items
 const operatorItems = operatorGroups.flatMap(g => g.items.map(i => i.to));
 assert(!operatorItems.includes('/forecasting'), 'Forecasting is hidden from Warehouse Operator');
-assert(!operatorItems.includes('/forecasting#evaluation'), 'Reports is hidden from Warehouse Operator');
+assert(!operatorItems.includes('/reports'), 'Reports is hidden from Warehouse Operator');
 assert(!operatorItems.includes('/optimizer'), 'Optimizer is hidden from Warehouse Operator');
 assert(!operatorItems.includes('/iot'), 'IoT Monitoring is hidden from Warehouse Operator');
 assert(!operatorItems.includes('/users'), 'Users is hidden from Warehouse Operator');
@@ -226,7 +226,7 @@ const wmGroups = filterNavGroupsForRole('warehouse_manager');
 const wmItems = wmGroups.flatMap(g => g.items.map(i => i.to));
 
 assert(!wmItems.includes('/forecasting'), 'Forecasting is hidden from Warehouse Manager');
-assert(wmItems.includes('/forecasting#evaluation'), 'Reports is visible to Warehouse Manager (PERM_REPORTS_VIEW)');
+assert(wmItems.includes('/reports'), 'Reports is visible to Warehouse Manager (PERM_REPORTS_VIEW)');
 assert(wmItems.includes('/iot'), 'IoT is visible to Warehouse Manager');
 assert(!wmItems.includes('/optimizer'), 'Optimizer is hidden from Warehouse Manager');
 assert(!wmItems.includes('/users'), 'Users is hidden from Warehouse Manager');
