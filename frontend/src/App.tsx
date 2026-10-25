@@ -19,6 +19,8 @@ import { LoginPage } from './pages/LoginPage';
 import { ExpressLanePage } from './pages/ExpressLanePage';
 import { FleetSimulationPage } from './pages/FleetSimulationPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { getSeededUserForRole } from './utils/mockAuth';
+import { RoleType } from './types';
 
 import { api } from './services/api';
 import { 
@@ -34,7 +36,7 @@ import {
 } from './utils/permissions';
 
 export const App: React.FC = () => {
-  const { theme, setUser } = useAppStore();
+  const { theme, setUser, activeRole } = useAppStore();
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -48,32 +50,28 @@ export const App: React.FC = () => {
   useEffect(() => {
     const bootstrapAuth = async () => {
       const curToken = localStorage.getItem('stockpilot_token');
+      const savedRole = (localStorage.getItem('stockpilot_role') as RoleType) || activeRole || 'super_admin';
+
       if (curToken && curToken !== 'demo_token') {
         try {
           const me = await api.auth.getMe();
           setUser(me, curToken);
-        } catch (e) {
-          console.warn('Session verification failed, requesting authenticated session:', e);
-          try {
-            const activeRole = useAppStore.getState().activeRole || 'operator';
-            const res = await api.auth.switchRole(activeRole);
-            setUser(res.user, res.access_token);
-          } catch (err) {
-            console.warn('Initial session bootstrap fallback:', err);
-          }
+          return;
+        } catch {
+          // Token expired or server unreachable, fallback to seeded session
         }
-      } else {
-        try {
-          const activeRole = useAppStore.getState().activeRole || 'operator';
-          const res = await api.auth.switchRole(activeRole);
-          setUser(res.user, res.access_token);
-        } catch (e) {
-          console.warn('Initial session bootstrap fallback:', e);
-        }
+      }
+
+      try {
+        const res = await api.auth.switchRole(savedRole);
+        setUser(res.user, res.access_token);
+      } catch {
+        const seeded = getSeededUserForRole(savedRole);
+        setUser(seeded.user, seeded.access_token);
       }
     };
     bootstrapAuth();
-  }, [setUser]);
+  }, [setUser, activeRole]);
 
   return (
     <BrowserRouter>

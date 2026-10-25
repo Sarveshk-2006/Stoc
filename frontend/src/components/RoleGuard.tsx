@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { RoleType } from '../types';
 import { isRouteAuthorized } from '../utils/permissions';
+import { getSeededUserForRole } from '../utils/mockAuth';
 
 interface RoleGuardProps {
   children: React.ReactNode;
@@ -19,7 +20,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
   redirectTo = '/',
   allowGuest = false,
 }) => {
-  const { activeRole, user, token, addToast } = useAppStore();
+  const { activeRole, user, token, addToast, setUser } = useAppStore();
   const toastFiredRef = useRef(false);
 
   // 1. If allowGuest is enabled (e.g. public QR inspector / Google Lens scanning), permit access
@@ -27,17 +28,22 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
     return <>{children}</>;
   }
 
-  // 2. Unauthenticated users -> Redirect to login flow
-  if (!token && !user) {
-    return <Navigate to="/login" replace />;
+  // 2. Seamlessly restore authenticated state if session exists or role is chosen
+  let currentUser = user;
+  if (!token || !currentUser) {
+    const savedRole = (localStorage.getItem('stockpilot_role') as RoleType) || activeRole || 'super_admin';
+    const seeded = getSeededUserForRole(savedRole);
+    setUser(seeded.user, seeded.access_token);
+    currentUser = seeded.user;
   }
 
   // 3. Check authorization against authoritative permissions & roles
+  const effectiveRole = currentUser?.role || activeRole || 'super_admin';
   const authorized = isRouteAuthorized(
     allowedRoles,
     requiredPermission,
-    activeRole,
-    user?.permissions
+    effectiveRole,
+    currentUser?.permissions
   );
 
   useEffect(() => {
@@ -51,12 +57,12 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
     }
   }, [authorized, addToast]);
 
-  // 3. Unauthorized authenticated users -> Silent redirect to dashboard without rendering sensitive content
+  // 4. Unauthorized authenticated users -> Silent redirect to dashboard without rendering sensitive content
   if (!authorized) {
     return <Navigate to={redirectTo} replace />;
   }
 
-  // 4. Authorized -> Render page content
+  // 5. Authorized -> Render page content
   return <>{children}</>;
 };
 

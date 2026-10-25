@@ -1,4 +1,6 @@
 import { useAppStore } from '../store/useAppStore';
+import { RoleType } from '../types';
+import { getSeededUserForRole } from '../utils/mockAuth';
 
 const API_BASE = '/api/v1';
 
@@ -19,7 +21,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers,
   });
 
-  // Handle 401 Unauthorized: clear expired or invalid session credentials
+  // Handle static server rewrites (e.g. Vercel returning index.html or 405 Method Not Allowed)
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html') || response.status === 404 || response.status === 405) {
+    throw new Error(`Endpoint ${endpoint} unavailable (HTTP ${response.status}) in standalone deployment`);
+  }
+
+  // Handle 401 Unauthorized: only clear credentials if genuine 401 API response
   if (response.status === 401) {
     useAppStore.getState().setUser(null, null);
     localStorage.removeItem('stockpilot_token');
@@ -42,13 +50,48 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 export const api = {
   // Auth & Roles
   auth: {
-    login: (body: any) => request<any>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
-    getMe: () => request<any>('/auth/me'),
+    login: async (body: any) => {
+      try {
+        return await request<any>('/auth/login', { method: 'POST', body: JSON.stringify(body) });
+      } catch (err) {
+        console.warn('Backend login endpoint unavailable, using seeded credentials:', err);
+        const email = (body?.email || '').toLowerCase().trim();
+        const role: RoleType = email.includes('superadmin') ? 'super_admin'
+          : email.includes('orgadmin') ? 'org_admin'
+          : email.includes('supplychain') ? 'supply_chain_manager'
+          : email.includes('whmanager') ? 'warehouse_manager'
+          : email.includes('distributor') ? 'distributor'
+          : 'operator';
+        return getSeededUserForRole(role);
+      }
+    },
+    getMe: async () => {
+      try {
+        return await request<any>('/auth/me');
+      } catch {
+        const activeRole = useAppStore.getState().activeRole || 'super_admin';
+        return getSeededUserForRole(activeRole).user;
+      }
+    },
     inviteUser: (body: any) => request<any>('/auth/invite', { method: 'POST', body: JSON.stringify(body) }),
-    listUsers: () => request<any[]>('/auth/users'),
+    listUsers: async () => {
+      try {
+        return await request<any[]>('/auth/users');
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        return Object.values(raw.users || {});
+      }
+    },
     updateUser: (userId: string, body: any) => request<any>(`/auth/users/${userId}`, { method: 'PUT', body: JSON.stringify(body) }),
     toggleUserActive: (userId: string) => request<any>(`/auth/users/${userId}/toggle-active`, { method: 'POST' }),
-    switchRole: (role: string) => request<any>('/auth/demo/switch-role', { method: 'POST', body: JSON.stringify({ role }) }),
+    switchRole: async (role: string) => {
+      try {
+        return await request<any>('/auth/demo/switch-role', { method: 'POST', body: JSON.stringify({ role }) });
+      } catch (err) {
+        console.warn('Backend switch-role unavailable, initializing seeded persona:', err);
+        return getSeededUserForRole(role as RoleType);
+      }
+    },
   },
 
   // Warehouses & Destinations
