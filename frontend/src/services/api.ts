@@ -93,6 +93,8 @@ export const api = {
       if (product_id) search.set('product_id', product_id);
       return request<any>(`/inventory/reconcile?${search.toString()}`);
     },
+    updateSafetyStock: (body: { product_id: string; warehouse_id?: string; safety_stock: number; notes?: string }) =>
+      request<any>('/inventory/safety-stock', { method: 'PUT', body: JSON.stringify(body) }),
   },
 
   // Transfers

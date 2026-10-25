@@ -238,5 +238,23 @@ void main() {
       final queue = localStorage.getPendingQueue();
       expect(queue.length, 0);
     });
+
+    test('Network failure during getInventory throws NetworkException and does NOT return fabricated demo inventory', () async {
+      mockApi.exceptionToThrow = NetworkException('No connection to server');
+
+      expect(
+        () async => await repo.getInventory(warehouseId: 'wh_chicago_01'),
+        throwsA(isA<NetworkException>()),
+      );
+    });
+
+    test('Network failure during getBatches throws NetworkException and does NOT return fabricated demo batches', () async {
+      mockApi.exceptionToThrow = NetworkException('No connection to server');
+
+      expect(
+        () async => await repo.getBatches(warehouseId: 'wh_chicago_01'),
+        throwsA(isA<NetworkException>()),
+      );
+    });
   });
 }

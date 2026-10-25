@@ -15,9 +15,11 @@ interface AppState {
   selectedWarehouseId: string;
   theme: 'dark' | 'light';
   toasts: Toast[];
+  mobileSidebarOpen: boolean;
   setUser: (user: User | null, token: string | null) => void;
   setActiveRole: (role: RoleType) => void;
   setSelectedWarehouseId: (id: string) => void;
+  setMobileSidebarOpen: (open: boolean) => void;
   toggleTheme: () => void;
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
@@ -30,6 +32,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedWarehouseId: 'all',
   theme: (localStorage.getItem('stockpilot_theme') as 'dark' | 'light') || 'light',
   toasts: [],
+  mobileSidebarOpen: false,
 
   setUser: (user, token) => {
     if (token) localStorage.setItem('stockpilot_token', token);
@@ -48,6 +51,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setSelectedWarehouseId: (id: string) => set({ selectedWarehouseId: id }),
+  setMobileSidebarOpen: (open: boolean) => set({ mobileSidebarOpen: open }),
 
   toggleTheme: () => {
     const nextTheme = get().theme === 'dark' ? 'light' : 'dark';

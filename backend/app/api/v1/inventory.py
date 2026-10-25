@@ -1,4 +1,6 @@
 from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.core.database import db
 from app.models.domain import (
@@ -385,3 +387,60 @@ def reconcile_inventory(
         org_id=current_user["org_id"],
         product_id=product_id
     )
+
+class SafetyStockPolicyUpdate(BaseModel):
+    product_id: str
+    safety_stock: int
+    warehouse_id: Optional[str] = None
+    notes: Optional[str] = ""
+
+@router.put("/safety-stock", summary="Update persistent safety stock policy")
+def update_safety_stock_policy(
+    req: SafetyStockPolicyUpdate,
+    current_user: dict = Depends(require_permission(PERM_INVENTORY_ADJUST))
+):
+    if req.safety_stock < 0:
+        raise HTTPException(status_code=400, detail="Safety stock buffer must be non-negative.")
+    
+    org_id = current_user["org_id"]
+    prd = db.get_document("products", req.product_id)
+    if not prd or (current_user.get("role") != ROLE_SUPER_ADMIN and prd.get("org_id") != org_id):
+        raise HTTPException(status_code=404, detail=f"Product '{req.product_id}' not found in organization.")
+    
+    if req.warehouse_id and req.warehouse_id != "all":
+        validate_warehouse_access(current_user, req.warehouse_id)
+
+    updated_items = InventoryService.update_safety_stock_policy(
+        product_id=req.product_id,
+        safety_stock=req.safety_stock,
+        warehouse_id=req.warehouse_id,
+        org_id=org_id
+    )
+    updated_records = [item["id"] for item in updated_items]
+
+    AuditService.log_event(
+        org_id=org_id,
+        actor_id=current_user["id"],
+        actor_name=current_user["full_name"],
+        actor_role=current_user["role"],
+        action="SAFETY_STOCK_POLICY_UPDATED",
+        target_entity="product",
+        entity_id=req.product_id,
+        details={
+            "product_id": req.product_id,
+            "safety_stock": req.safety_stock,
+            "warehouse_id": req.warehouse_id or "all",
+            "notes": req.notes,
+            "updated_records_count": len(updated_records)
+        }
+    )
+    
+    return {
+        "success": True,
+        "product_id": req.product_id,
+        "safety_stock": req.safety_stock,
+        "warehouse_id": req.warehouse_id or "all",
+        "updated_at": now_iso,
+        "updated_count": len(updated_records)
+    }
+

@@ -35,25 +35,17 @@ class InventoryRepository {
   InventoryRepository({required this.apiClient, required this.localStorage});
 
   Future<List<InventoryItemModel>> getInventory({String? warehouseId}) async {
-    try {
-      final query = warehouseId != null && warehouseId != 'all' ? {'warehouse_id': warehouseId} : null;
-      final res = await apiClient.get('/inventory', queryParameters: query);
-      final list = res.data as List;
-      return list.map((e) => InventoryItemModel.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (_) {
-      return _getDemoInventory();
-    }
+    final query = warehouseId != null && warehouseId != 'all' ? {'warehouse_id': warehouseId} : null;
+    final res = await apiClient.get('/inventory', queryParameters: query);
+    final list = res.data as List;
+    return list.map((e) => InventoryItemModel.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<InventoryBatchModel>> getBatches({String? warehouseId}) async {
-    try {
-      final query = warehouseId != null && warehouseId != 'all' ? {'warehouse_id': warehouseId} : null;
-      final res = await apiClient.get('/inventory/batches', queryParameters: query);
-      final list = res.data as List;
-      return list.map((e) => InventoryBatchModel.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (_) {
-      return _getDemoBatches();
-    }
+    final query = warehouseId != null && warehouseId != 'all' ? {'warehouse_id': warehouseId} : null;
+    final res = await apiClient.get('/inventory/batches', queryParameters: query);
+    final list = res.data as List;
+    return list.map((e) => InventoryBatchModel.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<Map<String, dynamic>> resolveQrCode(String code) async {
@@ -471,102 +463,6 @@ class InventoryRepository {
     }
 
     return syncedCount;
-  }
-
-  List<InventoryItemModel> _getDemoInventory() {
-    return [
-      InventoryItemModel(
-        id: 'inv_wh_chicago_01_prd_vax_01',
-        warehouseId: 'wh_chicago_01',
-        productId: 'prd_vax_01',
-        productName: 'Comirnaty Ultra-Cold Vaccine',
-        productSku: 'PRD-VAX-01',
-        handling: 'cold_chain',
-        unit: 'vials',
-        warehouseName: 'Central Hub Chicago',
-        totalQuantity: 2250,
-        availableQuantity: 2200,
-        reservedQuantity: 50,
-        damagedQuantity: 0,
-        safetyStock: 200,
-        reorderPoint: 500,
-      ),
-      InventoryItemModel(
-        id: 'inv_wh_chicago_01_prd_ins_02',
-        warehouseId: 'wh_chicago_01',
-        productId: 'prd_ins_02',
-        productName: 'Humalog Rapid-Acting Insulin',
-        productSku: 'PRD-INS-02',
-        handling: 'cold_chain',
-        unit: 'pens',
-        warehouseName: 'Central Hub Chicago',
-        totalQuantity: 2200,
-        availableQuantity: 2050,
-        reservedQuantity: 150,
-        damagedQuantity: 0,
-        safetyStock: 350,
-        reorderPoint: 800,
-      ),
-      InventoryItemModel(
-        id: 'inv_wh_chicago_01_prd_ant_03',
-        warehouseId: 'wh_chicago_01',
-        productId: 'prd_ant_03',
-        productName: 'Amoxicillin 500mg Capsules',
-        productSku: 'PRD-ANT-03',
-        handling: 'ambient',
-        unit: 'bottles',
-        warehouseName: 'Central Hub Chicago',
-        totalQuantity: 4200,
-        availableQuantity: 4000,
-        reservedQuantity: 200,
-        damagedQuantity: 0,
-        safetyStock: 500,
-        reorderPoint: 1200,
-      ),
-    ];
-  }
-
-  List<InventoryBatchModel> _getDemoBatches() {
-    return [
-      InventoryBatchModel(
-        id: 'bat_vax_chi_01',
-        warehouseId: 'wh_chicago_01',
-        productId: 'prd_vax_01',
-        productName: 'Comirnaty Ultra-Cold Vaccine',
-        productSku: 'PRD-VAX-01',
-        warehouseName: 'Central Hub Chicago',
-        batchNumber: 'BN-VX-2026-A1',
-        supplierReference: 'Pfizer-BioNTech-GmbH',
-        mfgDate: '2026-01-10',
-        expiryDate: '2026-11-15',
-        quantity: 850,
-        reservedQuantity: 50,
-        damagedQuantity: 0,
-        unitCost: 22.50,
-        storageBin: 'CR-1-A04',
-        qrCodeId: 'STOCKPILOT://BATCH/BN-VX-2026-A1/WH/wh_chicago_01',
-        status: 'active',
-      ),
-      InventoryBatchModel(
-        id: 'bat_ins_chi_01',
-        warehouseId: 'wh_chicago_01',
-        productId: 'prd_ins_02',
-        productName: 'Humalog Rapid-Acting Insulin',
-        productSku: 'PRD-INS-02',
-        warehouseName: 'Central Hub Chicago',
-        batchNumber: 'BN-IN-2026-C3',
-        supplierReference: 'Eli Lilly & Co',
-        mfgDate: '2026-02-01',
-        expiryDate: '2026-12-20',
-        quantity: 2200,
-        reservedQuantity: 150,
-        damagedQuantity: 0,
-        unitCost: 16.50,
-        storageBin: 'CR-1-D08',
-        qrCodeId: 'STOCKPILOT://BATCH/BN-IN-2026-C3/WH/wh_chicago_01',
-        status: 'active',
-      ),
-    ];
   }
 
   Map<String, dynamic> _demoResolve(String code) {

@@ -17,8 +17,19 @@ import { WhatsAppPage } from './pages/WhatsAppPage';
 import { UsersPage } from './pages/UsersPage';
 import { LoginPage } from './pages/LoginPage';
 import { ExpressLanePage } from './pages/ExpressLanePage';
+import { FleetSimulationPage } from './pages/FleetSimulationPage';
 
 import { api } from './services/api';
+import { 
+  PERM_FORECASTS_VIEW, 
+  PERM_INVENTORY_VIEW, 
+  PERM_OPTIMIZATION_RUN, 
+  PERM_TRANSFERS_VIEW, 
+  PERM_SCANS_EXECUTE, 
+  PERM_IOT_READINGS_VIEW, 
+  PERM_INTEGRATIONS_MANAGE, 
+  PERM_USERS_MANAGE 
+} from './utils/permissions';
 
 export const App: React.FC = () => {
   const { theme, setUser } = useAppStore();
@@ -42,7 +53,7 @@ export const App: React.FC = () => {
         } catch (e) {
           console.warn('Session verification failed, requesting authenticated session:', e);
           try {
-            const activeRole = useAppStore.getState().activeRole || 'supply_chain_manager';
+            const activeRole = useAppStore.getState().activeRole || 'operator';
             const res = await api.auth.switchRole(activeRole);
             setUser(res.user, res.access_token);
           } catch (err) {
@@ -51,7 +62,7 @@ export const App: React.FC = () => {
         }
       } else {
         try {
-          const activeRole = useAppStore.getState().activeRole || 'supply_chain_manager';
+          const activeRole = useAppStore.getState().activeRole || 'operator';
           const res = await api.auth.switchRole(activeRole);
           setUser(res.user, res.access_token);
         } catch (e) {
@@ -72,7 +83,7 @@ export const App: React.FC = () => {
         <Route
           path="/*"
           element={
-            <div className="min-h-screen flex bg-white text-slate-900 antialiased industrial-grid">
+            <div className="min-h-screen flex bg-[#F5F8FC] text-[#172B3A] antialiased selection:bg-[#0D9488] selection:text-white">
               {/* Persistent Collapsible Sidebar with Dynamic Role-Filtered Navigation */}
               <Sidebar />
 
@@ -86,7 +97,10 @@ export const App: React.FC = () => {
                     <Route 
                       path="/optimizer" 
                       element={
-                        <RoleGuard allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager']}>
+                        <RoleGuard 
+                          allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager']}
+                          requiredPermission={PERM_OPTIMIZATION_RUN}
+                        >
                           <OptimizerPage />
                         </RoleGuard>
                       } 
@@ -94,7 +108,10 @@ export const App: React.FC = () => {
                     <Route 
                       path="/forecasting" 
                       element={
-                        <RoleGuard allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager']}>
+                        <RoleGuard 
+                          allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager']}
+                          requiredPermission={PERM_FORECASTS_VIEW}
+                        >
                           <ForecastingPage />
                         </RoleGuard>
                       } 
@@ -102,7 +119,10 @@ export const App: React.FC = () => {
                     <Route 
                       path="/inventory" 
                       element={
-                        <RoleGuard allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager', 'distributor', 'operator']}>
+                        <RoleGuard 
+                          allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager', 'distributor', 'operator']}
+                          requiredPermission={PERM_INVENTORY_VIEW}
+                        >
                           <InventoryPage />
                         </RoleGuard>
                       } 
@@ -110,7 +130,10 @@ export const App: React.FC = () => {
                     <Route 
                       path="/iot" 
                       element={
-                        <RoleGuard allowedRoles={['super_admin', 'org_admin', 'warehouse_manager']}>
+                        <RoleGuard 
+                          allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager']}
+                          requiredPermission={PERM_IOT_READINGS_VIEW}
+                        >
                           <IoTPage />
                         </RoleGuard>
                       } 
@@ -118,7 +141,10 @@ export const App: React.FC = () => {
                     <Route 
                       path="/qr" 
                       element={
-                        <RoleGuard allowedRoles={['super_admin', 'org_admin', 'warehouse_manager', 'distributor', 'operator']}>
+                        <RoleGuard 
+                          allowedRoles={['super_admin', 'org_admin', 'warehouse_manager', 'distributor', 'operator', 'supply_chain_manager']}
+                          requiredPermission={PERM_SCANS_EXECUTE}
+                        >
                           <QRScannerPage />
                         </RoleGuard>
                       } 
@@ -126,7 +152,10 @@ export const App: React.FC = () => {
                     <Route 
                       path="/scanner" 
                       element={
-                        <RoleGuard allowedRoles={['super_admin', 'org_admin', 'warehouse_manager', 'distributor', 'operator']}>
+                        <RoleGuard 
+                          allowedRoles={['super_admin', 'org_admin', 'warehouse_manager', 'distributor', 'operator', 'supply_chain_manager']}
+                          requiredPermission={PERM_SCANS_EXECUTE}
+                        >
                           <QRScannerPage />
                         </RoleGuard>
                       } 
@@ -134,7 +163,10 @@ export const App: React.FC = () => {
                     <Route 
                       path="/whatsapp" 
                       element={
-                        <RoleGuard allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager']}>
+                        <RoleGuard 
+                          allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager']}
+                          requiredPermission={PERM_INTEGRATIONS_MANAGE}
+                        >
                           <WhatsAppPage />
                         </RoleGuard>
                       } 
@@ -142,7 +174,10 @@ export const App: React.FC = () => {
                     <Route 
                       path="/users" 
                       element={
-                        <RoleGuard allowedRoles={['super_admin', 'org_admin']}>
+                        <RoleGuard 
+                          allowedRoles={['super_admin', 'org_admin']}
+                          requiredPermission={PERM_USERS_MANAGE}
+                        >
                           <UsersPage />
                         </RoleGuard>
                       } 
@@ -150,22 +185,37 @@ export const App: React.FC = () => {
                     <Route 
                       path="/express" 
                       element={
-                        <RoleGuard allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager']}>
+                        <RoleGuard 
+                          allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager', 'distributor']}
+                          requiredPermission={PERM_TRANSFERS_VIEW}
+                        >
                           <ExpressLanePage />
                         </RoleGuard>
                       } 
                     />
+                    <Route 
+                      path="/simulation" 
+                      element={
+                        <RoleGuard allowedRoles={['super_admin', 'org_admin', 'supply_chain_manager', 'warehouse_manager', 'distributor', 'operator']}>
+                          <FleetSimulationPage />
+                        </RoleGuard>
+                      } 
+                    />
+                    <Route path="/fleet" element={<Navigate to="/simulation" replace />} />
+                    <Route path="/routes" element={<Navigate to="/simulation" replace />} />
+                    <Route path="/transfers" element={<Navigate to="/express" replace />} />
+                    <Route path="/reports" element={<Navigate to="/forecasting" replace />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </main>
               </div>
+
+              {/* Toast Notifications System */}
+              <ToastContainer />
             </div>
           }
         />
       </Routes>
-
-      {/* Global Toast Notifications */}
-      <ToastContainer />
     </BrowserRouter>
   );
 };

@@ -1,5 +1,6 @@
 import os
 from typing import List
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -47,6 +48,22 @@ class Settings(BaseSettings):
 
     # Express Lane Fast-Fulfillment Feature Flag (Default OFF)
     EXPRESS_LANE_ENABLED: bool = os.getenv("EXPRESS_LANE_ENABLED", "false").lower() in ("true", "1", "yes")
+
+    @model_validator(mode="after")
+    def validate_production_security(self):
+        if self.ENVIRONMENT.lower() in ("production", "prod"):
+            known_insecure_defaults = [
+                "stockpilot-super-secret-production-key-triwizathon-2026",
+                "stockpilot-iot-secure-esp32-auth-token",
+                "stockpilot-admin-bootstrap-secret-2026"
+            ]
+            if self.SECRET_KEY in known_insecure_defaults:
+                raise ValueError("Insecure production configuration: SECRET_KEY cannot use default development fallback in production.")
+            if self.IOT_API_KEY in known_insecure_defaults:
+                raise ValueError("Insecure production configuration: IOT_API_KEY cannot use default development fallback in production.")
+            if self.ALLOW_DEMO_MODE:
+                raise ValueError("Insecure production configuration: ALLOW_DEMO_MODE must be disabled in production.")
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

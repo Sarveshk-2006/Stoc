@@ -1034,6 +1034,7 @@ class InventoryService:
                         store.set_document("inventory", inv_key, inv)
 
             store.set_document("transfers", transfer_id, trf)
+            return trf
         res = db.run_transaction(txn)
         from app.services.firebase_service import FirebaseService
         FirebaseService.sync_to_firestore("transfers", transfer_id, res)
@@ -1525,3 +1526,62 @@ class InventoryService:
             return trf_doc
 
         return db.run_transaction(txn)
+
+    @staticmethod
+    def update_safety_stock_policy(
+        product_id: str,
+        safety_stock: int,
+        warehouse_id: Optional[str] = None,
+        org_id: str = "org_triwiz_01"
+    ) -> List[Dict[str, Any]]:
+        """
+        Updates safety stock buffer policy for a clinical product.
+        Persists policy to the transactional datastore and returns updated inventory items.
+        """
+        def txn(store):
+            now_iso = datetime.now(timezone.utc).isoformat()
+            updated_items = []
+            
+            prd = store.get_document("products", product_id)
+            if not prd or (prd.get("org_id") != org_id and prd.get("organization_id") != org_id):
+                raise HTTPException(status_code=404, detail=f"Product '{product_id}' not found.")
+
+            if warehouse_id and warehouse_id != "all":
+                inv_key = f"inv_{warehouse_id}_{product_id}"
+                inv = store.get_document("inventory", inv_key)
+                if not inv:
+                    inv = {
+                        "id": inv_key,
+                        "org_id": org_id,
+                        "warehouse_id": warehouse_id,
+                        "product_id": product_id,
+                        "total_quantity": 0,
+                        "available_quantity": 0,
+                        "reserved_quantity": 0,
+                        "in_transit_quantity": 0,
+                        "safety_stock": safety_stock,
+                        "reorder_point": prd.get("reorder_point", 100),
+                        "created_at": now_iso,
+                        "updated_at": now_iso
+                    }
+                else:
+                    inv["safety_stock"] = safety_stock
+                    inv["updated_at"] = now_iso
+                store.set_document("inventory", inv_key, inv)
+                updated_items.append(dict(inv))
+            else:
+                prd["min_safety_stock"] = safety_stock
+                prd["updated_at"] = now_iso
+                store.set_document("products", product_id, prd)
+
+                inv_list = store.query("inventory", filters={"product_id": product_id}, org_id=org_id)
+                for inv in inv_list:
+                    inv["safety_stock"] = safety_stock
+                    inv["updated_at"] = now_iso
+                    store.set_document("inventory", inv["id"], inv)
+                    updated_items.append(dict(inv))
+            
+            return updated_items
+
+        return db.run_transaction(txn)
+

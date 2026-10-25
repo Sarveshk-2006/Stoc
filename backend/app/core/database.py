@@ -26,14 +26,14 @@ class TransactionalDataStore:
             return
         if not persistence_file or persistence_file == "backend/data/stockpilot_store.json":
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            c1 = os.path.join(base_dir, "data", "stockpilot_store.json")
-            c2 = os.path.join(base_dir, "backend", "data", "stockpilot_store.json")
-            if os.path.exists(c1):
-                self.persistence_file = c1
-            elif os.path.exists(c2):
-                self.persistence_file = c2
+            primary_path = os.path.join(base_dir, "data", "stockpilot_store.json")
+            repo_root_path = os.path.join(os.path.dirname(base_dir), "backend", "data", "stockpilot_store.json")
+            if os.path.exists(primary_path):
+                self.persistence_file = primary_path
+            elif os.path.exists(repo_root_path):
+                self.persistence_file = repo_root_path
             else:
-                self.persistence_file = c1
+                self.persistence_file = primary_path
         else:
             self.persistence_file = persistence_file
         self.persistence_file = os.path.abspath(os.path.normpath(self.persistence_file))

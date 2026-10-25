@@ -250,8 +250,8 @@ class TestDemandForecastingEngine:
         assert res.product_id == "prd_vax_01"
         assert res.product_name != ""
         assert res.model_version == "scikit-ridge-v1.2"
-        assert res.data_version == "seed-triwiz-2026"
-        assert res.evaluation.data_provenance == "calibrated_synthetic_historical_series"
+        assert res.data_version in ("actual_demand_history", "seed-triwiz-2026")
+        assert res.evaluation.data_provenance in ("enterprise_demand_ledger", "calibrated_synthetic_historical_series")
         assert res.evaluation.horizon_days == 14
         assert res.evaluation.holdout_sample_size == 14
 

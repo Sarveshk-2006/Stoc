@@ -1,24 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Zap, 
   Clock, 
-  AlertTriangle, 
   ShieldAlert, 
-  Truck, 
-  ArrowRight, 
   CheckCircle2, 
-  XCircle, 
-  TrendingUp, 
-  DollarSign, 
-  FileText, 
   RefreshCw,
-  Flame,
-  Award,
   Sliders,
-  ChevronRight,
-  Info
+  DollarSign,
+  TrendingUp,
+  Percent
 } from 'lucide-react';
 import { api } from '../services/api';
+import { Card, CardHeader } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
+import { KPICard } from '../components/KPICard';
+import { Skeleton } from '../components/ui/Skeleton';
 
 interface UrgencyClock {
   node_id: string;
@@ -81,7 +79,6 @@ export const ExpressLanePage: React.FC = () => {
   const [recommendation, setRecommendation] = useState<ExpressRecommendation | null>(null);
   const [simulation, setSimulation] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [evaluating, setEvaluating] = useState<boolean>(false);
   const [approving, setApproving] = useState<boolean>(false);
   const [approvalResult, setApprovalResult] = useState<any>(null);
 
@@ -90,11 +87,18 @@ export const ExpressLanePage: React.FC = () => {
   const [contentionBetaHours, setContentionBetaHours] = useState<number>(2.5);
   const [contentionResult, setContentionResult] = useState<any>(null);
 
-  useEffect(() => {
-    loadInitialData();
-  }, [selectedSku]);
+  const evaluateNode = useCallback(async (nodeId: string, sku: string) => {
+    setApprovalResult(null);
+    try {
+      const rec = await api.express.evaluateOptions(nodeId, sku);
+      setRecommendation(rec);
+      setSelectedNodeId(nodeId);
+    } catch (err) {
+      console.error('Failed to evaluate options:', err);
+    }
+  }, []);
 
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     setLoading(true);
     try {
       const [cfg, sos, sim] = await Promise.all([
@@ -107,7 +111,6 @@ export const ExpressLanePage: React.FC = () => {
       setClocks(sos.clocks || []);
       setSimulation(sim);
 
-      // Evaluate the first urgent node
       const targetNode = sos.clocks?.[0]?.node_id || 'dest_boston_01';
       setSelectedNodeId(targetNode);
       await evaluateNode(targetNode, selectedSku);
@@ -116,21 +119,11 @@ export const ExpressLanePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedSku, evaluateNode]);
 
-  const evaluateNode = async (nodeId: string, sku: string) => {
-    setEvaluating(true);
-    setApprovalResult(null);
-    try {
-      const rec = await api.express.evaluateOptions(nodeId, sku);
-      setRecommendation(rec);
-      setSelectedNodeId(nodeId);
-    } catch (err) {
-      console.error('Failed to evaluate options:', err);
-    } finally {
-      setEvaluating(false);
-    }
-  };
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
 
   const toggleFeature = async () => {
     try {
@@ -193,95 +186,94 @@ export const ExpressLanePage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fadeIn">
-      {/* 1. Header Banner with Feature Flag Toggle */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute -right-16 -top-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-6">
+      {/* Top Page Header with Controls */}
+      <PageHeader
+        category="Quick-Commerce & Dark Store Logistics"
+        title="Express Lane: Fast-Fulfillment Engine"
+        subtitle="Evaluates in-flight truck detours, peer dark store courier rebalancing, and dedicated express vans against regular delivery economics."
+        actions={
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Badge variant={enabled ? 'teal' : 'neutral'} dot={enabled}>
+              {enabled ? 'FEATURE ACTIVE' : 'FEATURE OFF (STANDBY)'}
+            </Badge>
+
+            <Button
+              variant={enabled ? 'outline' : 'primary'}
+              size="sm"
+              icon={Sliders}
+              onClick={toggleFeature}
+            >
+              {enabled ? 'Disable Express' : 'Enable Express Lane'}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
+              onClick={loadInitialData}
+            >
+              Refresh
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Diurnal Demand Assumption Ribbon */}
+      <Card className="p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E5EAF0] gap-2">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="p-2 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30 flex items-center justify-center">
-                <Zap className="w-6 h-6 animate-pulse" />
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                Express Lane: Fast-Fulfillment Engine
-              </h1>
-              <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${
-                enabled 
-                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
-                  : 'bg-slate-700/50 text-slate-400 border-slate-600'
-              }`}>
-                {enabled ? 'FEATURE ACTIVE' : 'FEATURE OFF (STANDBY)'}
-              </span>
-            </div>
-            <p className="text-slate-400 text-sm max-w-2xl">
-              Quick-Commerce Dark Store urgent replenishment (Blinkit / Zepto model). 
-              Evaluates in-flight truck detours, peer dark store courier rebalancing, and dedicated express vans against regular delivery economics.
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#172B3A]">
+              Diurnal Intra-Day Demand Distribution Curve
+            </h3>
+            <p className="text-xs text-[#667085] mt-0.5">
+              Calibrated hourly dark store customer consumption profiles for rapid stockout estimation.
             </p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <button
-              onClick={toggleFeature}
-              className={`px-4 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all shadow-md ${
-                enabled 
-                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700' 
-                  : 'bg-amber-600 hover:bg-amber-500 text-white'
-              }`}
-            >
-              <Sliders className="w-4 h-4" />
-              {enabled ? 'Disable Express Lane' : 'Enable Express Lane'}
-            </button>
-            <button
-              onClick={loadInitialData}
-              className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 text-sm flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
-          </div>
+          <span className="text-xs font-medium text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
+            ⚡ Evening Peak (16:00 - 20:00 UTC)
+          </span>
         </div>
 
-        {/* Diurnal Demand Assumption Ribbon */}
-        <div className="mt-6 pt-5 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {Object.entries(config?.hourly_demand_pattern || {}).map(([slot, share]: any) => (
             <div 
               key={slot}
               className={`p-3 rounded-xl border text-center transition-all ${
                 slot === '16-20' 
-                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' 
-                  : 'bg-slate-800/40 border-slate-800 text-slate-400'
+                  ? 'bg-teal-50/60 border-teal-300 text-teal-900' 
+                  : 'bg-[#F7F9FC] border-[#E5EAF0] text-[#667085]'
               }`}
             >
-              <div className="text-xs font-mono">{slot} UTC</div>
-              <div className="text-base font-bold mt-0.5">{(share * 100).toFixed(0)}% Vol</div>
-              <div className="text-[10px] uppercase tracking-wider mt-0.5">
-                {slot === '16-20' ? '⚡ Evening Peak' : 'Standard Window'}
+              <div className="text-xs font-mono font-semibold">{slot} UTC</div>
+              <div className="text-base font-bold text-[#172B3A] mt-0.5">{(share * 100).toFixed(0)}% Vol</div>
+              <div className="text-[10px] uppercase tracking-wider mt-0.5 font-medium">
+                {slot === '16-20' ? 'Peak Surge' : 'Standard'}
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
-      {/* 2. Urgent Clocks Grid across Dark Stores */}
+      {/* Urgent Clocks Grid across Dark Stores */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-amber-600" />
+            <h2 className="text-base font-bold text-[#172B3A] flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[#0D9488]" />
               Live Dark Store Urgency Clocks
             </h2>
-            <p className="text-slate-500 text-sm">
-              Automatically triggers when P(stockout before next scheduled delivery) &gt; 50%
+            <p className="text-xs text-[#667085]">
+              Autonomous trigger when stockout probability before next scheduled replenishment exceeds 50%.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Monitor SKU:</span>
+          <div className="flex items-center gap-2 bg-white border border-[#E5EAF0] px-3 py-1.5 rounded-xl text-xs">
+            <span className="font-semibold text-[#667085]">Monitor SKU:</span>
             <select
               value={selectedSku}
               onChange={(e) => setSelectedSku(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-amber-500"
+              className="bg-transparent border-none text-[#172B3A] font-medium focus:outline-none cursor-pointer"
             >
               <option value="PRD-VAX-01">PRD-VAX-01 (Comirnaty Vaccine - Essential)</option>
               <option value="PRD-INS-02">PRD-INS-02 (Humalog Insulin - Essential)</option>
@@ -290,133 +282,139 @@ export const ExpressLanePage: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {clocks.map((c) => {
-            const isSelected = c.node_id === selectedNodeId;
-            return (
-              <div
-                key={c.node_id}
-                onClick={() => evaluateNode(c.node_id, selectedSku)}
-                className={`p-5 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
-                  isSelected 
-                    ? 'ring-2 ring-amber-500 border-amber-500 bg-amber-50/20 shadow-md' 
-                    : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
-                }`}
-              >
-                {c.is_critical && (
-                  <div className="absolute top-0 right-0 bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
-                    CRITICAL &lt; 1H
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Skeleton className="h-36" />
+            <Skeleton className="h-36" />
+            <Skeleton className="h-36" />
+            <Skeleton className="h-36" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {clocks.map((c) => {
+              const isSelected = c.node_id === selectedNodeId;
+              return (
+                <div
+                  key={c.node_id}
+                  onClick={() => evaluateNode(c.node_id, selectedSku)}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden text-xs ${
+                    isSelected 
+                      ? 'ring-2 ring-teal-500 border-teal-500 bg-teal-50/20 shadow-sm' 
+                      : 'bg-white border-[#E5EAF0] hover:border-slate-300 shadow-2xs'
+                  }`}
+                >
+                  {c.is_critical && (
+                    <div className="absolute top-0 right-0 bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
+                      CRITICAL &lt; 1H
+                    </div>
+                  )}
+
+                  <div className="text-[11px] font-semibold text-[#667085] mb-1">{c.node_id}</div>
+                  <h3 className="font-bold text-[#172B3A] text-sm mb-3 truncate">{c.node_name}</h3>
+
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-[#667085]">Hours to Stockout</span>
+                    <span className={`text-xl font-mono font-bold ${
+                      c.hours_to_stockout < 2 ? 'text-rose-600' : c.hours_to_stockout < 5 ? 'text-amber-600' : 'text-teal-700'
+                    }`}>
+                      {c.hours_to_stockout.toFixed(1)}h
+                    </span>
                   </div>
-                )}
 
-                <div className="text-xs font-semibold text-slate-400 mb-1">{c.node_id}</div>
-                <h3 className="font-bold text-slate-900 text-sm mb-3 line-clamp-1">{c.node_name}</h3>
+                  <div className="w-full bg-slate-100 rounded-full h-2 mb-3 overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        c.stockout_probability > 0.7 ? 'bg-rose-500' : c.stockout_probability > 0.4 ? 'bg-amber-500' : 'bg-teal-500'
+                      }`}
+                      style={{ width: `${Math.min(100, c.stockout_probability * 100)}%` }}
+                    />
+                  </div>
 
-                <div className="flex items-baseline justify-between mb-2">
-                  <span className="text-xs text-slate-500">Hours to Stockout</span>
-                  <span className={`text-xl font-mono font-bold ${
-                    c.hours_to_stockout < 2 ? 'text-rose-600' : c.hours_to_stockout < 5 ? 'text-amber-600' : 'text-emerald-600'
-                  }`}>
-                    {c.hours_to_stockout.toFixed(1)}h
-                  </span>
+                  <div className="flex items-center justify-between text-[11px] text-[#667085] pt-2 border-t border-[#E5EAF0]">
+                    <span>Stock: <strong className="text-[#172B3A]">{c.current_stock.toFixed(0)} units</strong></span>
+                    <span>P(Stockout): <strong className="text-[#172B3A]">{(c.stockout_probability * 100).toFixed(0)}%</strong></span>
+                  </div>
                 </div>
-
-                <div className="w-full bg-slate-100 rounded-full h-2 mb-3 overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      c.stockout_probability > 0.7 ? 'bg-rose-500' : c.stockout_probability > 0.4 ? 'bg-amber-500' : 'bg-emerald-500'
-                    }`}
-                    style={{ width: `${Math.min(100, c.stockout_probability * 100)}%` }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
-                  <span>Stock: <b>{c.current_stock.toFixed(0)} units</b></span>
-                  <span>P(Stockout): <b>{(c.stockout_probability * 100).toFixed(0)}%</b></span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* 3. Four Fast-Fulfillment Options Side-by-Side Comparison */}
+      {/* 4 Fast-Fulfillment Options Matrix */}
       {recommendation && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <Flame className="w-5 h-5 text-amber-600" />
+              <h2 className="text-base font-bold text-[#172B3A] flex items-center gap-2">
+                <Zap className="w-4 h-4 text-[#0D9488]" />
                 4-Option Fast Fulfillment Matrix: {recommendation.node_name}
               </h2>
-              <p className="text-slate-500 text-sm">
-                Evaluates transport premium against preserved gross margin and customer goodwill.
+              <p className="text-xs text-[#667085]">
+                Evaluates transport premiums against preserved gross margins and customer retention.
               </p>
             </div>
 
             {recommendation.is_critical_override && (
-              <span className="px-3 py-1 bg-rose-100 text-rose-800 border border-rose-300 rounded-full text-xs font-bold flex items-center gap-1.5 self-start sm:self-auto">
-                <ShieldAlert className="w-4 h-4 text-rose-600" />
-                CRITICAL OVERRIDE: Essential Medical SKU Protected
-              </span>
+              <Badge variant="danger" size="md">
+                <ShieldAlert className="w-3.5 h-3.5 mr-1" />
+                Critical Override: Essential Medical SKU Protected
+              </Badge>
             )}
           </div>
 
           {/* Winner Recommendation Banner */}
-          <div className={`p-5 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm ${
+          <Card className={`p-5 border ${
             recommendation.recommended_option_type === 'WAIT'
-              ? 'bg-slate-50 border-slate-300'
-              : 'bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-transparent border-amber-500/30'
+              ? 'bg-[#F7F9FC] border-[#E5EAF0]'
+              : 'bg-teal-50/40 border-teal-300'
           }`}>
-            <div className="flex items-start gap-3.5">
-              <span className={`p-2.5 rounded-xl flex items-center justify-center shrink-0 ${
-                recommendation.recommended_option_type === 'WAIT'
-                  ? 'bg-slate-200 text-slate-700'
-                  : 'bg-emerald-600 text-white'
-              }`}>
-                {recommendation.recommended_option_type === 'WAIT' ? (
-                  <Clock className="w-6 h-6" />
-                ) : (
-                  <CheckCircle2 className="w-6 h-6" />
-                )}
-              </span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Autonomous Decision Engine:</span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                    {recommendation.recommended_option.name}
-                  </span>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className={`p-2.5 rounded-xl shrink-0 ${
+                  recommendation.recommended_option_type === 'WAIT'
+                    ? 'bg-slate-200 text-slate-700'
+                    : 'bg-[#0D9488] text-white'
+                }`}>
+                  {recommendation.recommended_option_type === 'WAIT' ? (
+                    <Clock className="w-5 h-5" />
+                  ) : (
+                    <CheckCircle2 className="w-5 h-5" />
+                  )}
                 </div>
-                <p className="text-sm text-slate-700 mt-1 font-medium leading-relaxed">
-                  {recommendation.rationale}
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#667085]">Autonomous Decision Engine:</span>
+                    <Badge variant="teal" size="sm">
+                      {recommendation.recommended_option.name}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-[#172B3A] mt-1 font-medium leading-relaxed">
+                    {recommendation.rationale}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {recommendation.recommended_option_type !== 'WAIT' && (
-              <div className="flex items-center gap-3 shrink-0 self-end md:self-auto">
-                <button
+              {recommendation.recommended_option_type !== 'WAIT' && (
+                <Button
+                  variant="primary"
+                  size="md"
                   onClick={handleApprove}
                   disabled={approving || Boolean(approvalResult)}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center gap-2"
+                  loading={approving}
+                  icon={CheckCircle2}
                 >
-                  {approving ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
                   {approvalResult ? 'Transfer Approved ✓' : 'One-Click Approve & Dispatch'}
-                </button>
-              </div>
-            )}
-          </div>
+                </Button>
+              )}
+            </div>
+          </Card>
 
           {approvalResult && (
-            <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-sm flex items-center gap-3">
+            <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
               <div>
-                <b>Ledger Transfer Created:</b> #{approvalResult.transfer_number} via {approvalResult.dispatch_method}. 
-                State set to APPROVED in global ledger with full audit rationale recorded.
+                <strong>Ledger Transfer Created:</strong> #{approvalResult.transfer_number} via {approvalResult.dispatch_method}. State set to APPROVED in global ledger with full audit rationale recorded.
               </div>
             </div>
           )}
@@ -426,118 +424,108 @@ export const ExpressLanePage: React.FC = () => {
             {recommendation.options.map((opt) => {
               const isWinner = opt.option_type === recommendation.recommended_option_type;
               return (
-                <div
+                <Card
                   key={opt.option_type}
-                  className={`p-5 rounded-2xl border flex flex-col justify-between transition-all ${
+                  className={`p-5 flex flex-col justify-between transition-all ${
                     isWinner 
-                      ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/20 shadow-md' 
-                      : 'bg-white border-slate-200'
+                      ? 'border-[#0D9488] ring-2 ring-teal-500/20 shadow-sm' 
+                      : 'border-[#E5EAF0]'
                   }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono font-bold text-slate-400">
+                      <span className="text-xs font-mono font-bold text-[#667085]">
                         {opt.option_type}
                       </span>
                       {isWinner && (
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
+                        <Badge variant="teal" size="sm">
                           RECOMMENDED
-                        </span>
+                        </Badge>
                       )}
                     </div>
 
-                    <h3 className="font-bold text-slate-900 text-base mb-1">{opt.name}</h3>
-                    <p className="text-slate-500 text-xs mb-4 min-h-[32px]">{opt.tagline}</p>
+                    <h3 className="font-bold text-[#172B3A] text-sm mb-1">{opt.name}</h3>
+                    <p className="text-[#667085] text-xs mb-4 min-h-[32px]">{opt.tagline}</p>
 
-                    <div className="space-y-2 pt-3 border-t border-slate-100 text-xs">
+                    <div className="space-y-2 pt-3 border-t border-[#E5EAF0] text-xs">
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Transit ETA:</span>
-                        <span className="font-bold text-slate-900">{opt.eta_hours.toFixed(1)} hours</span>
+                        <span className="text-[#667085]">Transit ETA:</span>
+                        <span className="font-semibold text-[#172B3A]">{opt.eta_hours.toFixed(1)} hours</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Extra Surcharge:</span>
-                        <span className="font-bold text-slate-900">${opt.extra_cost.toFixed(2)}</span>
+                        <span className="text-[#667085]">Extra Surcharge:</span>
+                        <span className="font-semibold text-[#172B3A]">${opt.extra_cost.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Units Saved:</span>
-                        <span className="font-bold text-slate-900">{opt.units_saved.toFixed(0)} units</span>
+                        <span className="text-[#667085]">Units Saved:</span>
+                        <span className="font-semibold text-[#172B3A]">{opt.units_saved.toFixed(0)} units</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Margin Preserved:</span>
-                        <span className="font-bold text-emerald-600">+${opt.margin_saved.toFixed(2)}</span>
+                        <span className="text-[#667085]">Margin Preserved:</span>
+                        <span className="font-bold text-teal-700">+${opt.margin_saved.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Goodwill Value:</span>
-                        <span className="font-bold text-emerald-600">+${opt.goodwill_saved.toFixed(2)}</span>
+                        <span className="text-[#667085]">Goodwill Value:</span>
+                        <span className="font-bold text-teal-700">+${opt.goodwill_saved.toFixed(2)}</span>
                       </div>
-                      {opt.rescue_bonus > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">FEFO Waste Rescue:</span>
-                          <span className="font-bold text-amber-600">+${opt.rescue_bonus.toFixed(2)}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
 
-                  <div className="mt-5 pt-3 border-t border-slate-100">
+                  <div className="mt-4 pt-3 border-t border-[#E5EAF0]">
                     <div className="flex items-baseline justify-between mb-2">
-                      <span className="text-xs font-semibold text-slate-600">Net Benefit:</span>
-                      <span className={`text-base font-mono font-bold ${
-                        opt.net_benefit > 0 ? 'text-emerald-600' : 'text-slate-500'
+                      <span className="text-xs font-semibold text-[#172B3A]">Net Benefit:</span>
+                      <span className={`text-sm font-mono font-bold ${
+                        opt.net_benefit > 0 ? 'text-teal-700' : 'text-[#667085]'
                       }`}>
                         {opt.net_benefit > 0 ? `+$${opt.net_benefit.toFixed(2)}` : `$${opt.net_benefit.toFixed(2)}`}
                       </span>
                     </div>
 
                     {!opt.is_feasible ? (
-                      <div className="text-[11px] text-rose-600 bg-rose-50 p-2 rounded-lg font-medium leading-tight">
+                      <div className="text-[11px] text-rose-700 bg-rose-50 p-2 rounded-lg font-medium leading-tight">
                         {opt.infeasible_reason}
                       </div>
                     ) : (
-                      <div className="text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded-lg font-medium">
-                        Feasible &amp; Verified ({opt.transit_km.toFixed(0)} km corridor)
+                      <div className="text-[11px] text-teal-800 bg-teal-50 p-2 rounded-lg font-medium">
+                        Feasible & Verified ({opt.transit_km.toFixed(0)} km corridor)
                       </div>
                     )}
                   </div>
-                </div>
+                </Card>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* 4. Contention Resolution Studio */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Award className="w-5 h-5 text-indigo-600" />
-              Contention Rationing Studio
-            </h2>
-            <p className="text-slate-500 text-sm">
-              Priority Score = (1 / hours_to_stockout) &times; SKU Priority Weight &times; Customer Density
-            </p>
-          </div>
-          <button
-            onClick={runContentionSimulation}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm self-start sm:self-auto"
-          >
-            <Sliders className="w-4 h-4" />
-            Simulate Contention
-          </button>
-        </div>
+      {/* Contention Rationing Studio */}
+      <Card className="p-5 space-y-4">
+        <CardHeader
+          title="Contention Rationing Studio"
+          subtitle="Priority Score = (1 / hours_to_stockout) × SKU Priority Weight × Customer Density"
+          action={
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Sliders}
+              onClick={runContentionSimulation}
+            >
+              Simulate Contention
+            </Button>
+          }
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div className="p-4 bg-[#F7F9FC] rounded-xl border border-[#E5EAF0] space-y-3">
             <div className="flex justify-between items-center">
-              <span className="font-bold text-sm text-slate-900">Dark Store Alpha (Downtown Core)</span>
-              <span className="text-xs font-mono px-2 py-0.5 bg-slate-200 text-slate-700 rounded font-semibold">
-                Density: 1.3 &bull; Weight: 1.5
+              <span className="font-semibold text-[#172B3A]">Dark Store Alpha (Downtown Core)</span>
+              <span className="text-[11px] font-mono px-2 py-0.5 bg-white border border-[#E5EAF0] text-[#667085] rounded font-semibold">
+                Density: 1.3 • Weight: 1.5
               </span>
             </div>
             <div>
-              <div className="flex justify-between text-xs text-slate-600 mb-1">
-                <span>Stockout Clock: <b>{contentionAlphaHours.toFixed(1)} hours</b></span>
+              <div className="flex justify-between text-xs text-[#667085] mb-1">
+                <span>Stockout Clock: <strong>{contentionAlphaHours.toFixed(1)} hours</strong></span>
               </div>
               <input 
                 type="range"
@@ -546,21 +534,21 @@ export const ExpressLanePage: React.FC = () => {
                 step="0.1"
                 value={contentionAlphaHours}
                 onChange={(e) => setContentionAlphaHours(parseFloat(e.target.value))}
-                className="w-full accent-indigo-600"
+                className="w-full accent-teal-600 cursor-pointer"
               />
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+          <div className="p-4 bg-[#F7F9FC] rounded-xl border border-[#E5EAF0] space-y-3">
             <div className="flex justify-between items-center">
-              <span className="font-bold text-sm text-slate-900">Dark Store Beta (Suburban East)</span>
-              <span className="text-xs font-mono px-2 py-0.5 bg-slate-200 text-slate-700 rounded font-semibold">
-                Density: 1.0 &bull; Weight: 1.5
+              <span className="font-semibold text-[#172B3A]">Dark Store Beta (Suburban East)</span>
+              <span className="text-[11px] font-mono px-2 py-0.5 bg-white border border-[#E5EAF0] text-[#667085] rounded font-semibold">
+                Density: 1.0 • Weight: 1.5
               </span>
             </div>
             <div>
-              <div className="flex justify-between text-xs text-slate-600 mb-1">
-                <span>Stockout Clock: <b>{contentionBetaHours.toFixed(1)} hours</b></span>
+              <div className="flex justify-between text-xs text-[#667085] mb-1">
+                <span>Stockout Clock: <strong>{contentionBetaHours.toFixed(1)} hours</strong></span>
               </div>
               <input 
                 type="range"
@@ -569,116 +557,121 @@ export const ExpressLanePage: React.FC = () => {
                 step="0.1"
                 value={contentionBetaHours}
                 onChange={(e) => setContentionBetaHours(parseFloat(e.target.value))}
-                className="w-full accent-indigo-600"
+                className="w-full accent-teal-600 cursor-pointer"
               />
             </div>
           </div>
         </div>
 
         {contentionResult && (
-          <div className="space-y-3 pt-4 border-t border-slate-100">
-            <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Rationing Allocation Result:</div>
+          <div className="space-y-3 pt-3 border-t border-[#E5EAF0]">
+            <div className="text-xs font-semibold text-[#667085] uppercase tracking-wider">Rationing Allocation Result:</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {contentionResult.items.map((item: any, idx: number) => (
                 <div 
                   key={item.request_id}
                   className={`p-4 rounded-xl border flex items-start gap-3 ${
                     idx === 0 
-                      ? 'bg-emerald-50/50 border-emerald-300' 
-                      : 'bg-slate-50 border-slate-200'
+                      ? 'bg-teal-50/50 border-teal-300' 
+                      : 'bg-[#F7F9FC] border-[#E5EAF0]'
                   }`}
                 >
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
-                    idx === 0 ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-700'
+                    idx === 0 ? 'bg-[#0D9488] text-white' : 'bg-slate-200 text-slate-700'
                   }`}>
                     {idx + 1}
                   </span>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-slate-900">{item.node_name}</span>
-                      <span className="text-xs font-mono px-2 py-0.5 bg-white border rounded font-bold text-indigo-700">
+                      <span className="font-bold text-sm text-[#172B3A]">{item.node_name}</span>
+                      <span className="text-[11px] font-mono px-2 py-0.5 bg-white border border-[#E5EAF0] rounded font-bold text-teal-800">
                         Score: {item.priority_score.toFixed(1)}
                       </span>
                     </div>
-                    <div className="text-xs font-semibold text-emerald-800 mt-1">
+                    <div className="text-xs font-semibold text-teal-800 mt-1">
                       Awarded: {item.allocated_option}
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">{item.notes}</div>
+                    <div className="text-xs text-[#667085] mt-0.5">{item.notes}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* 5. 30-Day Comparative Simulation Report */}
+      {/* 30-Day Comparative Simulation Report */}
       {simulation && (
-        <div className="bg-slate-900 text-white border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <Card className="p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E5EAF0]">
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-1">
+              <div className="text-xs font-bold uppercase tracking-wider text-teal-700 mb-1">
                 Historical Impact Assessment
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
-                What would have happened over the last 30 days if Express Lane had been active?
+              <h2 className="text-base sm:text-lg font-bold text-[#172B3A]">
+                30-Day Express Lane Historical Simulation
               </h2>
             </div>
 
-            <div className="px-3.5 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-xl text-amber-300 text-xs font-bold">
+            <Badge variant="teal" size="md">
               ROI Multiple: {simulation.roi_multiple}x Return
-            </div>
+            </Badge>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 bg-slate-800/60 border border-slate-800 rounded-xl">
-              <div className="text-xs text-slate-400">Stockouts Avoided</div>
-              <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">
-                {simulation.total_stockouts_avoided_units.toFixed(0)} units
-              </div>
-            </div>
-            <div className="p-4 bg-slate-800/60 border border-slate-800 rounded-xl">
-              <div className="text-xs text-slate-400">Margin Preserved</div>
-              <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">
-                ${simulation.gross_margin_preserved.toLocaleString()}
-              </div>
-            </div>
-            <div className="p-4 bg-slate-800/60 border border-slate-800 rounded-xl">
-              <div className="text-xs text-slate-400">Extra Transport Spend</div>
-              <div className="text-2xl font-bold font-mono text-amber-400 mt-1">
-                ${simulation.total_extra_spend.toLocaleString()}
-              </div>
-            </div>
-            <div className="p-4 bg-slate-800/60 border border-slate-800 rounded-xl">
-              <div className="text-xs text-slate-400">Net Profit Impact</div>
-              <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">
-                +${simulation.net_profit_impact.toLocaleString()}
-              </div>
-            </div>
+            <KPICard
+              title="Stockouts Avoided"
+              value={`${simulation.total_stockouts_avoided_units.toFixed(0)} units`}
+              subtitle="Critical inventory preserved"
+              statusDotColor="bg-emerald-500"
+              icon={CheckCircle2}
+            />
+            <KPICard
+              title="Margin Preserved"
+              value={`$${simulation.gross_margin_preserved.toLocaleString()}`}
+              subtitle="Retained dark store revenue"
+              statusDotColor="bg-teal-500"
+              icon={DollarSign}
+            />
+            <KPICard
+              title="Extra Transport Spend"
+              value={`$${simulation.total_extra_spend.toLocaleString()}`}
+              subtitle="Dedicated express surcharges"
+              statusDotColor="bg-blue-500"
+              icon={TrendingUp}
+            />
+            <KPICard
+              title="Net Profit Impact"
+              value={`+$${simulation.net_profit_impact.toLocaleString()}`}
+              subtitle="Preserved margin minus freight"
+              statusDotColor="bg-emerald-500"
+              icon={Percent}
+            />
           </div>
 
-          {/* Scenarios Table */}
-          <div className="space-y-3">
-            <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          <div className="space-y-3 pt-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-[#667085]">
               Evaluated Benchmark Scenarios (A, B, C):
             </div>
             <div className="space-y-3">
               {simulation.scenarios?.map((scen: any) => (
-                <div key={scen.scenario_id} className="p-4 bg-slate-800/40 border border-slate-800 rounded-xl space-y-2">
+                <div key={scen.scenario_id} className="p-4 bg-[#F7F9FC] border border-[#E5EAF0] rounded-xl space-y-1.5 text-xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <span className="font-bold text-sm text-white">{scen.name}</span>
-                    <span className="px-2.5 py-0.5 bg-slate-700 text-slate-200 text-xs font-mono rounded font-semibold self-start sm:self-auto">
+                    <span className="font-semibold text-sm text-[#172B3A]">{scen.name}</span>
+                    <Badge variant="neutral" size="sm">
                       Decision: {scen.recommended_decision}
-                    </span>
+                    </Badge>
                   </div>
-                  <p className="text-xs text-slate-400">{scen.description}</p>
-                  <p className="text-xs text-emerald-400/90 font-medium">{scen.audit_notes}</p>
+                  <p className="text-[#667085]">{scen.description}</p>
+                  <p className="text-teal-800 font-medium">{scen.audit_notes}</p>
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );
 };
+
+export default ExpressLanePage;

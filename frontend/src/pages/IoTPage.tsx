@@ -1,22 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../services/api';
 import { useAppStore } from '../store/useAppStore';
 import { IoTDevice, SensorReading, IoTAlert } from '../types';
 import { KPICard } from '../components/KPICard';
+import { Card, CardHeader } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Skeleton } from '../components/ui/Skeleton';
 import { 
   ThermometerSnowflake, 
   Droplets, 
-  BatteryMedium, 
   Wifi, 
   AlertTriangle, 
-  ShieldCheck, 
-  Activity, 
-  CheckCircle2, 
   Radio, 
   Send,
   DoorOpen,
   DoorClosed,
-  RefreshCw
+  RefreshCw,
+  Check
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -43,17 +45,13 @@ export const IoTPage: React.FC = () => {
   const [simDoorOpen, setSimDoorOpen] = useState(false);
   const [simulating, setSimulating] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [selectedDeviceId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [devData, readData, altData] = await Promise.all([
-        api.iot.getDevices(),
-        api.iot.getReadings(selectedDeviceId),
-        api.iot.getAlerts(),
+        api.iot.getDevices().catch(() => []),
+        api.iot.getReadings(selectedDeviceId).catch(() => []),
+        api.iot.getAlerts().catch(() => []),
       ]);
       setDevices(devData);
       setReadings(readData);
@@ -69,7 +67,11 @@ export const IoTPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDeviceId, addToast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleAcknowledgeAlert = async (alertId: string) => {
     try {
@@ -114,85 +116,87 @@ export const IoTPage: React.FC = () => {
   };
 
   const activeDevice = devices.find(d => d.device_id === selectedDeviceId);
-  const chartData = readings.map(r => ({
-    time: r.timestamp.substring(11, 16),
-    'Temperature (°C)': r.temperature_c,
-    'Humidity (%)': r.humidity_percent,
-  }));
+  
+  const chartData = useMemo(() => {
+    return readings.map(r => ({
+      time: r.timestamp ? r.timestamp.substring(11, 16) : '',
+      'Temperature (°C)': r.temperature_c,
+      'Humidity (%)': r.humidity_percent,
+    }));
+  }, [readings]);
 
-  const unackAlerts = alerts.filter(a => !a.acknowledged);
+  const unackAlerts = useMemo(() => {
+    return alerts.filter(a => !a.acknowledged);
+  }, [alerts]);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-slate-900 border border-slate-800 text-white">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#0D9488]">
-              Cold-Chain Environmental Control
-            </span>
-            <span className="text-xs px-2 py-0.5 rounded bg-[#0D9488]/15 text-[#0D9488] font-mono font-bold">
-              Authenticated ESP32 Sensors
-            </span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight mt-1">
-            IoT Warehouse Storage Telemetry & Anomaly Detection
-          </h1>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-            Monitors real-time ultra-low vaccine cold rooms, insulin vaults, and ambient pharmaceutical aisles. Ingests authenticated sensor readings and flags temperature excursions automatically.
-          </p>
-        </div>
+      {/* Top Page Header */}
+      <PageHeader
+        category="Cold-Chain Environmental Telemetry & IoT"
+        title="IoT Warehouse Storage Telemetry & Anomaly Detection"
+        subtitle="Monitors real-time ultra-low vaccine cold rooms, insulin vaults, and ambient pharmaceutical aisles with automated excursion alerts."
+        actions={
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Device Switcher */}
+            <div className="flex items-center gap-2 bg-white border border-[#E5EAF0] shadow-xs rounded-xl px-3 py-1.5 text-xs text-[#172B3A]">
+              <Radio className="w-4 h-4 text-[#0D9488]" />
+              <select
+                value={selectedDeviceId}
+                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                className="bg-transparent border-none text-[#172B3A] font-medium focus:outline-none cursor-pointer pr-2"
+              >
+                {devices.map(d => {
+                  const statusTag = d.connectivity_status ? d.connectivity_status.toUpperCase() : (d.is_online ? "ONLINE" : "OFFLINE");
+                  return (
+                    <option key={d.device_id} value={d.device_id}>
+                      {d.device_name} [{statusTag}] ({d.storage_zone.split('(')[0]})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
 
-        {/* Device Switcher */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs">
-            <Radio className="w-4 h-4 text-[#0D9488] animate-pulse" />
-            <select
-              value={selectedDeviceId}
-              onChange={(e) => setSelectedDeviceId(e.target.value)}
-              className="bg-transparent border-none text-white focus:outline-none font-medium cursor-pointer"
+            <Button
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
+              onClick={loadData}
+              disabled={loading}
+              loading={loading}
             >
-              {devices.map(d => {
-                const statusTag = d.connectivity_status ? d.connectivity_status.toUpperCase() : (d.is_online ? "ONLINE" : "OFFLINE");
-                return (
-                  <option key={d.device_id} value={d.device_id} className="bg-slate-900 text-white">
-                    {d.device_name} [{statusTag}] ({d.storage_zone.split('(')[0]})
-                  </option>
-                );
-              })}
-            </select>
+              Sync
+            </Button>
           </div>
-
-          <button
-            onClick={loadData}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Gauges & Status Cards for Active Device */}
-      {activeDevice && (
+      {activeDevice ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KPICard
             title="Storage Temperature"
             value={`${activeDevice.current_temp.toFixed(1)}°C`}
-            subtitle={`Safe Limit: ${activeDevice.temp_min_threshold}°C to ${activeDevice.temp_max_threshold}°C`}
+            subtitle={`Safe: ${activeDevice.temp_min_threshold}°C to ${activeDevice.temp_max_threshold}°C`}
             change={
               activeDevice.current_temp >= activeDevice.temp_min_threshold && activeDevice.current_temp <= activeDevice.temp_max_threshold
                 ? "In Spec"
                 : "Excursion"
             }
             isPositive={activeDevice.current_temp >= activeDevice.temp_min_threshold && activeDevice.current_temp <= activeDevice.temp_max_threshold}
+            statusDotColor={
+              activeDevice.current_temp >= activeDevice.temp_min_threshold && activeDevice.current_temp <= activeDevice.temp_max_threshold
+                ? "bg-teal-500"
+                : "bg-rose-500"
+            }
             icon={ThermometerSnowflake}
-            badge="Live Gauge"
           />
           <KPICard
             title="Storage Humidity"
             value={`${activeDevice.current_humidity.toFixed(1)}%`}
             subtitle={`Threshold: < ${activeDevice.humidity_max_threshold}%`}
             isPositive={activeDevice.current_humidity <= activeDevice.humidity_max_threshold}
+            statusDotColor="bg-blue-500"
             icon={Droplets}
           />
           <KPICard
@@ -200,8 +204,8 @@ export const IoTPage: React.FC = () => {
             value={activeDevice.connectivity_status ? activeDevice.connectivity_status.toUpperCase() : (activeDevice.is_online ? "ONLINE" : "OFFLINE")}
             subtitle={activeDevice.last_seen_text ? `Last Ping: ${activeDevice.last_seen_text}` : `MAC: ${activeDevice.mac_address}`}
             isPositive={activeDevice.connectivity_status === 'online' || (activeDevice.connectivity_status === undefined && activeDevice.is_online)}
+            statusDotColor="bg-emerald-500"
             icon={Wifi}
-            badge={activeDevice.connectivity_status === 'stale' ? 'STALE TELEMETRY' : (activeDevice.connectivity_status === 'offline' ? 'OFFLINE' : activeDevice.firmware_version)}
           />
           <KPICard
             title="Excursion Incidents"
@@ -209,88 +213,83 @@ export const IoTPage: React.FC = () => {
             subtitle={`${alerts.length} total event logs`}
             change={unackAlerts.length > 0 ? "Requires Review" : "Nominal"}
             isPositive={unackAlerts.length === 0}
+            statusDotColor={unackAlerts.length > 0 ? "bg-rose-500" : "bg-emerald-500"}
             icon={AlertTriangle}
           />
         </div>
-      )}
+      ) : loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+      ) : null}
 
       {/* Main Historical Chart & Interactive Hardware Simulator */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 24-Hour Telemetry Line Chart */}
-        <div className="lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
-                24-Hour Thermal Continuity Chart ({activeDevice?.storage_zone})
-              </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Hourly temperature trajectory showing automated cold-chain regulation compliance.
-              </p>
-            </div>
-            <span className="text-[10px] font-mono font-bold text-[#0D9488] bg-[#0D9488]/10 px-2 py-0.5 rounded">
-              24 Intervals
-            </span>
-          </div>
+        <Card className="p-5 lg:col-span-2 space-y-4">
+          <CardHeader
+            title={`24-Hour Thermal Continuity Chart (${activeDevice?.storage_zone || 'Active Zone'})`}
+            subtitle="Hourly temperature readings demonstrating strict continuous cold-chain compliance."
+            action={<Badge variant="teal">24 Intervals</Badge>}
+          />
 
-          <div className="h-72 w-full">
+          <div className="h-72 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                <XAxis dataKey="time" stroke="#94a3b8" fontSize={10} />
-                <YAxis stroke="#94a3b8" fontSize={10} />
+              <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF0" vertical={false} />
+                <XAxis dataKey="time" stroke="#667085" fontSize={11} tickLine={false} axisLine={{ stroke: '#E5EAF0' }} />
+                <YAxis stroke="#667085" fontSize={11} tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#090d16',
-                    borderColor: '#1e293b',
+                    backgroundColor: '#FFFFFF',
+                    borderColor: '#E5EAF0',
                     borderRadius: '8px',
                     fontSize: '12px',
-                    color: '#f8fafc',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
                 <Line
                   type="monotone"
                   dataKey="Temperature (°C)"
-                  stroke="#38bdf8"
-                  strokeWidth={2}
-                  dot={{ r: 2 }}
+                  stroke="#0D9488"
+                  strokeWidth={2.5}
+                  dot={{ r: 3, fill: '#0D9488' }}
                 />
                 <Line
                   type="monotone"
                   dataKey="Humidity (%)"
-                  stroke="#14b8a6"
+                  stroke="#17324D"
                   strokeWidth={1.5}
-                  strokeDasharray="2 2"
+                  strokeDasharray="3 3"
                   dot={false}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </Card>
 
         {/* Interactive Hardware Simulator Tool - VISIBLY ISOLATED FROM PRODUCTION */}
-        <div className="lg:col-span-1 rounded-2xl border-2 border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/10 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
-                ESP32 Telemetry Injector
-              </h3>
-            </div>
-            <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-              SIMULATOR LAB
-            </span>
-          </div>
-          <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-200">
-            <strong>Isolated Test Injection:</strong> Injected readings are marked with <code className="font-mono text-[10px] px-1 py-0.5 bg-amber-500/20 rounded">is_simulated: true</code> to prevent corrupting live physical device telemetry.
+        <Card className="p-5 lg:col-span-1 space-y-4 border-amber-200 bg-amber-50/20">
+          <CardHeader
+            title="ESP32 Telemetry Injector"
+            subtitle="Diagnostic test harness for simulating thermal drift and door ajar incidents."
+            action={<Badge variant="warning">SIMULATOR LAB</Badge>}
+          />
+
+          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
+            <strong>Isolated Test Injection:</strong> Injected readings are marked with <code className="font-mono text-[10px] px-1 py-0.5 bg-amber-200/50 rounded">is_simulated: true</code> to prevent corrupting physical sensor history.
           </div>
 
-          <div className="space-y-3.5 text-xs">
+          <div className="space-y-4 text-xs">
             {/* Temp Slider */}
             <div>
-              <div className="flex justify-between items-center mb-1.5 font-bold">
-                <span className="text-slate-700 dark:text-slate-300">Simulate Temp (°C)</span>
-                <span className={`font-mono text-sm ${simTemp > (activeDevice?.temp_max_threshold || 8) ? 'text-amber-700 dark:text-amber-300 font-black' : 'text-[#0D9488]'}`}>
+              <div className="flex justify-between items-center mb-1.5 font-semibold text-[#172B3A]">
+                <span>Simulate Temperature</span>
+                <span className={`font-mono text-sm font-bold ${simTemp > (activeDevice?.temp_max_threshold || 8) ? 'text-amber-700' : 'text-teal-700'}`}>
                   {simTemp.toFixed(1)}°C
                 </span>
               </div>
@@ -301,20 +300,20 @@ export const IoTPage: React.FC = () => {
                 step="0.5"
                 value={simTemp}
                 onChange={(e) => setSimTemp(parseFloat(e.target.value))}
-                className="w-full accent-amber-500 cursor-pointer"
+                className="w-full accent-amber-600 cursor-pointer"
               />
-              <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
-                <span>-30°C (Cryo)</span>
+              <div className="flex justify-between text-[10px] text-[#667085] mt-1">
+                <span>-30°C Cryo</span>
                 <span>Safe: 2°C - 8°C</span>
-                <span>+35°C (Spike)</span>
+                <span>+35°C Surge</span>
               </div>
             </div>
 
             {/* Humidity Slider */}
             <div>
-              <div className="flex justify-between items-center mb-1.5 font-bold">
-                <span className="text-slate-700 dark:text-slate-300">Simulate Humidity (%)</span>
-                <span className="font-mono text-teal-400">{simHumidity.toFixed(0)}%</span>
+              <div className="flex justify-between items-center mb-1.5 font-semibold text-[#172B3A]">
+                <span>Simulate Humidity</span>
+                <span className="font-mono text-sm font-bold text-teal-700">{simHumidity.toFixed(0)}%</span>
               </div>
               <input
                 type="range"
@@ -323,124 +322,113 @@ export const IoTPage: React.FC = () => {
                 step="5"
                 value={simHumidity}
                 onChange={(e) => setSimHumidity(parseFloat(e.target.value))}
-                className="w-full accent-teal-500 cursor-pointer"
+                className="w-full accent-teal-600 cursor-pointer"
               />
             </div>
 
             {/* Door Switch */}
-            <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-              <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300">
-                {simDoorOpen ? <DoorOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" /> : <DoorClosed className="w-4 h-4 text-[#0D9488]" />}
-                <span>Cold Room Door State</span>
+            <div className="flex items-center justify-between p-3 rounded-xl border border-[#E5EAF0] bg-white">
+              <div className="flex items-center gap-2 font-semibold text-[#172B3A]">
+                {simDoorOpen ? <DoorOpen className="w-4 h-4 text-amber-600" /> : <DoorClosed className="w-4 h-4 text-teal-700" />}
+                <span>Cold Bay Door Ajar</span>
               </div>
               <button
                 type="button"
                 onClick={() => setSimDoorOpen(!simDoorOpen)}
-                className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${
-                  simDoorOpen ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-slate-800 text-slate-400'
+                className={`text-[10px] font-bold px-2 py-1 rounded transition-colors cursor-pointer ${
+                  simDoorOpen ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
                 }`}
               >
                 {simDoorOpen ? 'DOOR AJAR' : 'CLOSED'}
               </button>
             </div>
 
-            <button
+            <Button
+              variant="primary"
+              size="md"
+              className="w-full"
+              icon={Send}
               onClick={handleInjectTelemetry}
               disabled={simulating}
-              className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              loading={simulating}
             >
-              <Send className="w-3.5 h-3.5" />
               {simulating ? 'Transmitting to Simulator...' : 'Inject Simulated Reading'}
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Active IoT Cold-Chain Alerts Table */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
-              Cold-Chain Excursion & Humidity Incident Alerts ({alerts.length})
-            </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Excursions require mandatory manager sign-off and temperature remediation logs.
-            </p>
-          </div>
-        </div>
+      <Card className="overflow-hidden">
+        <CardHeader
+          title={`Cold-Chain Excursion & Environmental Incident Alerts (${alerts.length})`}
+          subtitle="Mandatory quality compliance incident registry with managerial sign-off audit trail."
+        />
 
         {alerts.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-            ✓ All cold-chain zones operating strictly within defined thresholds.
+          <div className="p-8 text-center text-xs text-[#667085]">
+            ✓ All cold-chain zones operating strictly within defined temperature and humidity limits.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs table-dense">
+            <table className="table-enterprise">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase tracking-wider text-[11px]">
+                <tr>
                   <th>Severity</th>
-                  <th>Source</th>
-                  <th>Device / Sensor</th>
+                  <th>Source Mode</th>
+                  <th>Device Identifier</th>
                   <th>Incident Message</th>
-                  <th className="text-right">Reading</th>
-                  <th className="text-right">Limit</th>
+                  <th className="text-right">Observed Value</th>
+                  <th className="text-right">Safety Limit</th>
                   <th>Timestamp</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th>Resolution Status</th>
+                  <th className="text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono-num">
+              <tbody>
                 {alerts.map((alt) => (
-                  <tr key={alt.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr key={alt.id}>
                     <td>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-sans uppercase ${
-                        alt.severity === 'critical' ? 'bg-red-500/15 text-red-600 dark:text-red-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                      }`}>
+                      <Badge variant={alt.severity === 'critical' ? 'danger' : 'warning'} size="sm">
                         {alt.severity}
-                      </span>
+                      </Badge>
                     </td>
                     <td>
-                      {alt.is_simulated ? (
-                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                          SIMULATED
-                        </span>
-                      ) : (
-                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
-                          ESP32 LIVE
-                        </span>
-                      )}
+                      <Badge variant={alt.is_simulated ? 'warning' : 'teal'} size="sm">
+                        {alt.is_simulated ? 'SIMULATED' : 'ESP32 LIVE'}
+                      </Badge>
                     </td>
-                    <td className="font-mono text-[#0D9488]">{alt.device_id}</td>
-                    <td className="font-sans font-medium text-slate-800 dark:text-slate-200 max-w-sm">
+                    <td className="font-mono text-teal-800 font-semibold">{alt.device_id}</td>
+                    <td className="font-medium text-[#172B3A] max-w-sm">
                       {alt.message}
                     </td>
-                    <td className="text-right font-bold text-[#17324D] dark:text-slate-200">
-                      {alt.reading_value.toFixed(1)}
+                    <td className="text-right font-bold text-rose-700">
+                      {alt.reading_value.toFixed(1)}°C
                     </td>
-                    <td className="text-right text-slate-400">
-                      {alt.threshold_value.toFixed(1)}
+                    <td className="text-right text-[#667085]">
+                      {alt.threshold_value.toFixed(1)}°C
                     </td>
-                    <td className="text-slate-500 text-[11px] font-mono">
-                      {alt.timestamp.substring(11, 19)}
+                    <td className="text-[#667085] text-xs font-mono">
+                      {alt.timestamp ? alt.timestamp.substring(11, 19) : ''}
                     </td>
                     <td>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-sans ${
-                        alt.acknowledged ? 'bg-[#0D9488]/10 text-[#0D9488]' : 'bg-red-500/10 text-red-600 dark:text-red-400'
-                      }`}>
+                      <Badge variant={alt.acknowledged ? 'success' : 'danger'} size="sm">
                         {alt.acknowledged ? 'ACKNOWLEDGED' : 'ACTIVE EXCURSION'}
-                      </span>
+                      </Badge>
                     </td>
-                    <td>
+                    <td className="text-right whitespace-nowrap">
                       {!alt.acknowledged ? (
-                        <button
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={Check}
                           onClick={() => handleAcknowledgeAlert(alt.id)}
-                          className="px-2.5 py-1 rounded bg-[#0D9488] hover:bg-[#0D9488]/90 text-white text-[11px] font-bold transition-colors font-sans"
                         >
                           Acknowledge
-                        </button>
+                        </Button>
                       ) : (
-                        <span className="text-[11px] text-slate-500 font-sans">
-                          Signed off by {alt.acknowledged_by || 'Manager'}
+                        <span className="text-[11px] text-[#667085]">
+                          Signed by {alt.acknowledged_by || 'Manager'}
                           {alt.acknowledged_at ? ` (${alt.acknowledged_at.substring(11, 16)})` : ''}
                         </span>
                       )}
@@ -451,7 +439,9 @@ export const IoTPage: React.FC = () => {
             </table>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 };
+
+export default IoTPage;

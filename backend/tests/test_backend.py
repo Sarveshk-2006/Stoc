@@ -166,3 +166,56 @@ def test_whatsapp_status_and_stock_command():
     )
     assert "Comirnaty" in res_stock["reply_text"]
     assert "Total Available" in res_stock["reply_text"]
+
+# -------------------------------------------------------------
+# 5. Production Configuration Safeguards & Safety Stock Tests
+# -------------------------------------------------------------
+def test_production_configuration_safeguards():
+    from app.core.config import Settings
+    
+    # 1. Insecure default secret key in production must fail validation
+    with pytest.raises(ValueError, match="SECRET_KEY cannot use default"):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="stockpilot-super-secret-production-key-triwizathon-2026",
+            IOT_API_KEY="custom-strong-iot-key-12345",
+            ALLOW_DEMO_MODE=False
+        )
+
+    # 2. Demo mode enabled in production must fail validation
+    with pytest.raises(ValueError, match="ALLOW_DEMO_MODE must be disabled in production"):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="custom-strong-prod-key-abcdef1234567890",
+            IOT_API_KEY="custom-strong-iot-key-12345",
+            ALLOW_DEMO_MODE=True
+        )
+
+    # 3. Secure production settings must succeed
+    prod_valid = Settings(
+        ENVIRONMENT="production",
+        SECRET_KEY="custom-strong-prod-key-abcdef1234567890",
+        IOT_API_KEY="custom-strong-iot-key-12345",
+        ALLOW_DEMO_MODE=False
+    )
+    assert prod_valid.ENVIRONMENT == "production"
+    assert prod_valid.ALLOW_DEMO_MODE is False
+
+def test_safety_stock_policy_persistence():
+    # Update safety stock for clinical vaccine
+    updated = InventoryService.update_safety_stock_policy(
+        product_id="prd_vax_01",
+        safety_stock=1250,
+        warehouse_id="wh_chicago_01",
+        org_id="org_triwiz_01"
+    )
+    assert len(updated) > 0
+    assert updated[0]["safety_stock"] == 1250
+    assert updated[0]["product_id"] == "prd_vax_01"
+    assert updated[0]["warehouse_id"] == "wh_chicago_01"
+
+    # Re-fetch inventory directly to assert state was ACID committed to datastore
+    fresh_inv = db.get_document("inventory", "inv_wh_chicago_01_prd_vax_01")
+    assert fresh_inv is not None
+    assert fresh_inv["safety_stock"] == 1250
+

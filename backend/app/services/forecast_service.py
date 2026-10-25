@@ -101,7 +101,7 @@ class DemandForecastingService:
         df = df.set_index("parsed_date").reindex(full_range)
         df["demand"] = df["demand"].fillna(0.0)  # Missing periods explicitly treated as zero demand
         df["date_str"] = df.index.strftime("%Y-%m-%d")
-        df["day_of_week"] = df.index.weekday
+        df["day_of_week"] = df.index.day_of_week
         df["day_of_month"] = df.index.day
         df["time_index"] = np.arange(len(df))
         df = df.reset_index(drop=True)
