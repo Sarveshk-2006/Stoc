@@ -53,17 +53,46 @@ export const api = {
 
   // Warehouses & Destinations
   warehouses: {
-    list: () => request<any[]>('/warehouses'),
-    listDestinations: () => request<any[]>('/warehouses/destinations'),
+    list: async () => {
+      try {
+        return await request<any[]>('/warehouses');
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        return Object.values(raw.warehouses || {});
+      }
+    },
+    listDestinations: async () => {
+      try {
+        return await request<any[]>('/warehouses/destinations');
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        return Object.values(raw.destinations || {});
+      }
+    },
     create: (body: any) => request<any>('/warehouses', { method: 'POST', body: JSON.stringify(body) }),
     toggleOperational: (id: string) => request<any>(`/warehouses/${id}/toggle-operational`, { method: 'POST' }),
   },
 
   // Products & QR
   products: {
-    list: () => request<any[]>('/products'),
+    list: async () => {
+      try {
+        return await request<any[]>('/products');
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        return Object.values(raw.products || {});
+      }
+    },
     create: (body: any) => request<any>('/products', { method: 'POST', body: JSON.stringify(body) }),
-    resolveQr: (code: string) => request<any>(`/products/resolve-qr?code=${encodeURIComponent(code)}`),
+    resolveQr: async (code: string) => {
+      try {
+        return await request<any>(`/products/resolve-qr?code=${encodeURIComponent(code)}`);
+      } catch (err) {
+        console.warn('Backend resolve-qr unavailable or network error. Using embedded database seed:', err);
+        const { clientResolveQr } = await import('./clientQrResolver');
+        return clientResolveQr(code);
+      }
+    },
   },
 
   // Inventory & Ledger
@@ -74,13 +103,28 @@ export const api = {
       if (params?.product_id) search.set('product_id', params.product_id);
       return request<any[]>(`/inventory?${search.toString()}`);
     },
-    listBatches: (params?: { warehouse_id?: string; product_id?: string }) => {
-      const search = new URLSearchParams();
-      if (params?.warehouse_id && params.warehouse_id !== 'all') search.set('warehouse_id', params.warehouse_id);
-      if (params?.product_id) search.set('product_id', params.product_id);
-      return request<any[]>(`/inventory/batches?${search.toString()}`);
+    listBatches: async (params?: { warehouse_id?: string; product_id?: string }) => {
+      try {
+        const search = new URLSearchParams();
+        if (params?.warehouse_id && params.warehouse_id !== 'all') search.set('warehouse_id', params.warehouse_id);
+        if (params?.product_id) search.set('product_id', params.product_id);
+        return await request<any[]>(`/inventory/batches?${search.toString()}`);
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        let list = Object.values(raw.inventory_batches || {}) as any[];
+        if (params?.warehouse_id && params.warehouse_id !== 'all') list = list.filter(b => b.warehouse_id === params.warehouse_id);
+        if (params?.product_id) list = list.filter(b => b.product_id === params.product_id);
+        return list;
+      }
     },
-    listMovements: (limit = 50) => request<any[]>(`/inventory/movements?limit=${limit}`),
+    listMovements: async (limit = 50) => {
+      try {
+        return await request<any[]>(`/inventory/movements?limit=${limit}`);
+      } catch {
+        const raw = (await import('../data/seedData.json')).default as any;
+        return (Object.values(raw.inventory_movements || {}) as any[]).slice(0, limit);
+      }
+    },
     receiveStock: (body: any) => request<any>('/inventory/receive', { method: 'POST', body: JSON.stringify(body) }),
     dispatchStock: (body: any) => request<any>('/inventory/dispatch', { method: 'POST', body: JSON.stringify(body) }),
     adjustStock: (body: any) => request<any>('/inventory/adjust', { method: 'POST', body: JSON.stringify(body) }),
